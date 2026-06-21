@@ -1,0 +1,54 @@
+version: "3.9"
+
+networks:
+  korp-net:
+    driver: bridge
+
+services:
+  go-server:
+    build: .
+    container_name: go-server
+    networks:
+      - korp-net
+    # Porta NÃO exposta ao host — acesso só via Nginx na rede interna
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/http-server-projeto-korp.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - korp-net
+    depends_on:
+      - go-server
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - korp-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - korp-net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
